@@ -18,6 +18,7 @@ class BenchResult:
     n: int
     build_time: float
     search_time: float
+    id_search_time: float
     range_time: float
     info: str
 
@@ -41,6 +42,17 @@ def bench(name: str,
         structure.search(k)  # type: ignore[attr-defined]
     search_time = time.perf_counter() - t0
 
+    # Recherche sur une clé unique (id) : aucune structure ne peut
+    # s'arrêter plus tôt grâce aux doublons, comparaison plus équitable.
+    id_structure = factory()
+    for p in people:
+        id_structure.insert(p.id, p)  # type: ignore[attr-defined]
+    ids = [rng.choice(people).id for _ in range(n_searches)]
+    t0 = time.perf_counter()
+    for k in ids:
+        id_structure.search(k)  # type: ignore[attr-defined]
+    id_search_time = time.perf_counter() - t0
+
     intervals = [(a := rng.randint(17, 80), a + rng.randint(1, 10))
                  for _ in range(100)]
     t0 = time.perf_counter()
@@ -55,8 +67,8 @@ def bench(name: str,
     else:
         info = ""
 
-    return BenchResult(name, len(people), build_time,
-                       search_time, range_time, info)
+    return BenchResult(name, len(people), build_time, search_time,
+                       id_search_time, range_time, info)
 
 
 def run_all(people: list[Person]) -> list[BenchResult]:
@@ -76,8 +88,21 @@ def run_all(people: list[Person]) -> list[BenchResult]:
 
 
 def _print_pair(a: BenchResult, b: BenchResult) -> None:
-    print(f"{'':<25}{'build (s)':>12}{'search (ms)':>14}{'range (ms)':>14}   info")
+    print(f"{'':<25}{'build (s)':>12}{'search age (ms)':>17}"
+          f"{'search id (ms)':>16}{'range (ms)':>14}   info")
     for r in (a, b):
         print(f"{r.name:<25}{r.build_time:>12.4f}"
-              f"{r.search_time*1000:>14.2f}"
+              f"{r.search_time*1000:>17.2f}"
+              f"{r.id_search_time*1000:>16.2f}"
               f"{r.range_time*1000:>14.2f}   {r.info}")
+
+
+if __name__ == "__main__":
+    import sys
+
+    from data_loader import load_csv
+
+    if len(sys.argv) < 2:
+        print("Usage : python compare_perf.py adult_train.csv")
+        sys.exit(1)
+    run_all(load_csv(sys.argv[1]))
